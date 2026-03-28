@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Partner Portal — Completing sign-in...</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; margin: 0;
+      background: #f3f2f1; color: #323130;
+    }
+    .box {
+      text-align: center; padding: 40px;
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 360px; width: 100%;
+    }
+    .icon { font-size: 36px; margin-bottom: 16px; }
+    h2 { font-size: 20px; margin-bottom: 8px; font-weight: 600; }
+    p  { font-size: 14px; color: #605e5c; line-height: 1.5; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #edebe9;
+      border-top-color: #0078d4;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error { color: #a4262c; background: #fde7e9; padding: 12px; border-radius: 6px; font-size: 13px; margin-top: 16px; text-align: left; }
+  </style>
+</head>
+<body>
+<div class="box" id="box">
+  <div class="spinner"></div>
+  <h2>Completing sign-in...</h2>
+  <p>Please wait while we verify your identity.</p>
+</div>
+
+<script>
+  /*
+    ══════════════════════════════════════════════════════
+    CALLBACK PAGE
+    ══════════════════════════════════════════════════════
+    Entra redirects back here with ?code=... after the
+    user completes sign-up/sign-in.
+
+    For a pure SPA with no backend, the simplest approach
+    is to redirect the user straight to your protected app
+    and let the app (or SWA built-in auth) handle token
+    exchange.
+
+    If you have a backend, POST the code to it here.
+    ══════════════════════════════════════════════════════
+  */
+
+  const DESTINATION = "https://www.chanceofsecurity.com"; // your protected app
+
+  const params = new URLSearchParams(window.location.search);
+  const code  = params.get("code");
+  const error = params.get("error");
+  const errorDesc = params.get("error_description");
+
+  if (error) {
+    // Entra returned an error (user cancelled, policy error, etc.)
+    document.getElementById("box").innerHTML = `
+      <div class="icon">⚠️</div>
+      <h2>Sign-in failed</h2>
+      <p>${error}</p>
+      <div class="error">${decodeURIComponent(errorDesc || "")}</div>
+      <p style="margin-top:16px"><a href="/" style="color:#0078d4">Try again</a></p>
+    `;
+  } else if (code) {
+    // Success — redirect to your protected app
+    // The destination app / SWA handles session from here
+    document.querySelector("h2").textContent = "Signed in! Redirecting...";
+    setTimeout(() => {
+      window.location.replace(DESTINATION);
+    }, 1000);
+  } else {
+    // No code and no error — direct navigation to callback, go home
+    window.location.replace("/");
+  }
+</script>
+</body>
+</html>
