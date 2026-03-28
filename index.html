@@ -23,15 +23,35 @@
     }
     h1 { color: #2c3e50; margin-bottom: 1rem; }
     p { color: #34495e; line-height: 1.6; }
+    
+    .btn-signup {
+      background-color: #0078d4;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 1.5rem;
+      transition: background 0.3s;
+    }
+    .btn-signup:hover { background-color: #005a9e; }
+    .hidden { display: none; }
   </style>
   <title>Cloudy With a Chance Of Security</title>
   <script src="https://alcdn.msauth.net/browser/2.19.0/js/msal-browser.min.js"></script>
 </head>
 <body>
     <div class="container" id="mainContainer">
-        <h1>Welcome to Cloudy With a Chance Of Security! 🚀</h1>
-        <p>This is your default landing page.</p>
-        <p>The authentication logic is now passive. You are seeing this because the auto-redirect has been disabled.</p>
+        <h1>Cloudy With a Chance Of Security! 🚀</h1>
+        <p>Welcome to the landing page. Click below to register or sign in.</p>
+        
+        <button id="signUpButton" class="btn-signup" onclick="signUp()">Sign Up / Sign In</button>
+
+        <div id="welcomeMessage" class="hidden">
+            <h2 style="color: #27ae60;">Success!</h2>
+            <p>You are now authenticated. Redirecting you shortly...</p>
+        </div>
     </div>
 
     <script>
@@ -39,22 +59,38 @@
             auth: {
                 clientId: "bf9a3574-ba33-4ad0-9983-8587d6972ca6",
                 authority: "https://login.microsoftonline.com/f2c246b1-4fa5-4443-aed3-814c76b2cb0c",
+                knownAuthorities: ["login.microsoftonline.com"],
+                redirectUri: window.location.origin + "/"
             }
         };
 
         const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-        // We still handle the promise in case a user comes back FROM a login,
-        // but we removed the "msalInstance.loginRedirect" call that was causing the loop.
+        // This runs when the page loads to check if we just returned from Entra ID
         msalInstance.handleRedirectPromise()
             .then(response => {
                 if (response) {
-                    console.log("User is logged in:", response.account.username);
-                } else {
-                    console.log("No active session, but staying on page.");
+                    console.log("Auth Success:", response);
+                    document.getElementById('signUpButton').classList.add('hidden');
+                    document.getElementById('welcomeMessage').classList.remove('hidden');
+                    
+                    // Optional: Redirect after successful login
+                    setTimeout(() => {
+                        window.location.href = "https://msn.com";
+                    }, 3000);
                 }
             })
-            .catch(error => { console.error(error); });
+            .catch(error => { console.error("Redirect Error:", error); });
+
+        // The function triggered by the button
+        function signUp() {
+            msalInstance.loginRedirect({
+                // Using basic openid to avoid 403 scope issues
+                scopes: ["openid"], 
+                // This 'p' parameter triggers your specific User Flow
+                extraQueryParameters: { p: "B2X_1_SignUp" }
+            });
+        }
     </script>
 </body>
 </html>
