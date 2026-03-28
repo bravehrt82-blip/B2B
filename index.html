@@ -1,766 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Partner Access Portal</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Playfair+Display:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://alcdn.msauth.net/browser/2.38.4/js/msal-browser.min.js"></script>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partner Portal — Signing you in...</title>
 
-  :root {
-    --ink: #0f0e0d;
-    --paper: #f7f5f0;
-    --muted: #8a8680;
-    --accent: #1a56e8;
-    --accent-dark: #1241c0;
-    --border: #e2dfd8;
-    --success: #0d7a4e;
-    --error: #c0392b;
-    --card: #ffffff;
-  }
+  <!--
+    ══════════════════════════════════════════════════════
+    HOW THIS WORKS
+    ══════════════════════════════════════════════════════
+    This page immediately redirects the user to Microsoft
+    Entra's hosted sign-up/sign-in page for your B2B user
+    flow. No MSAL, no CDN, no JavaScript library needed.
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--paper);
-    color: var(--ink);
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
+    Entra handles the full sign-up experience:
+      • Email entry
+      • IDP detection / federation
+      • Google / Microsoft account sign-in
+      • OTP fallback for unknown domains
+      • Attribute collection
+      • Guest account creation
 
-  /* Left panel */
-  .left-panel {
-    background: var(--ink);
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 52px 56px;
-    position: relative;
-    overflow: hidden;
-  }
+    After sign-up/sign-in, Entra redirects back to your
+    app at the redirect_uri with an authorization code.
+    ══════════════════════════════════════════════════════
 
-  .left-panel::before {
-    content: '';
-    position: absolute;
-    top: -120px; right: -120px;
-    width: 420px; height: 420px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(26,86,232,0.25) 0%, transparent 70%);
-    pointer-events: none;
-  }
+    CONFIGURATION — update the 4 values below:
+  -->
+  <script>
+    const CLIENT_ID   = "bf9a3574-ba33-4ad0-9983-8587d6972ca6";
+    const TENANT_ID   = "f2c246b1-4fa5-4443-aed3-814c76b2cb0c";
+    const USER_FLOW   = "B2X_1_SignUp";      // your user flow name (auto-prefixed with B2X_1_ in Entra)
+    const REDIRECT_URI = window.location.origin + "/callback.html"; // where Entra returns the user
 
-  .left-panel::after {
-    content: '';
-    position: absolute;
-    bottom: -80px; left: -80px;
-    width: 300px; height: 300px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(26,86,232,0.15) 0%, transparent 70%);
-    pointer-events: none;
-  }
+    // Build the Entra authorize URL directly — no library needed
+    const params = new URLSearchParams({
+      client_id:     CLIENT_ID,
+      response_type: "code",
+      response_mode: "query",
+      redirect_uri:  REDIRECT_URI,
+      scope:         "openid profile email",
+      p:             USER_FLOW,              // tells Entra which user flow to use
+      nonce:         crypto.randomUUID(),    // replay protection
+      state:         btoa(window.location.href), // return to this page after login
+    });
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-family: 'Playfair Display', serif;
-    font-size: 20px;
-    letter-spacing: -0.3px;
-    position: relative;
-    z-index: 1;
-  }
+    const ENTRA_URL =
+      `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?${params}`;
 
-  .brand-dot {
-    width: 10px; height: 10px;
-    background: var(--accent);
-    border-radius: 50%;
-  }
+    // Immediate redirect — user never sees this page
+    window.location.replace(ENTRA_URL);
+  </script>
 
-  .left-content {
-    position: relative;
-    z-index: 1;
-  }
-
-  .left-content h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(32px, 3.5vw, 46px);
-    font-weight: 400;
-    line-height: 1.15;
-    letter-spacing: -1px;
-    margin-bottom: 20px;
-    color: #fff;
-  }
-
-  .left-content h1 em {
-    font-style: italic;
-    color: rgba(255,255,255,0.55);
-  }
-
-  .left-content p {
-    font-size: 15px;
-    color: rgba(255,255,255,0.55);
-    line-height: 1.7;
-    max-width: 340px;
-  }
-
-  .trust-badges {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .trust-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 13px;
-    color: rgba(255,255,255,0.45);
-  }
-
-  .trust-icon {
-    width: 32px; height: 32px;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .trust-icon svg { width: 15px; height: 15px; }
-
-  /* Right panel */
-  .right-panel {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px;
-  }
-
-  .card {
-    width: 100%;
-    max-width: 400px;
-  }
-
-  .card-header {
-    margin-bottom: 36px;
-  }
-
-  .card-header h2 {
-    font-family: 'Playfair Display', serif;
-    font-size: 26px;
-    font-weight: 400;
-    letter-spacing: -0.5px;
-    margin-bottom: 6px;
-    color: var(--ink);
-  }
-
-  .card-header p {
-    font-size: 14px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  /* Stages */
-  .stage { display: none; }
-  .stage.active { display: block; }
-
-  /* Email input stage */
-  .input-wrap {
-    position: relative;
-    margin-bottom: 8px;
-  }
-
-  .email-input {
-    width: 100%;
-    padding: 14px 16px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 15px;
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    background: var(--card);
-    color: var(--ink);
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    appearance: none;
-  }
-
-  .email-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(26,86,232,0.1);
-  }
-
-  .email-input.error { border-color: var(--error); }
-
-  .hint {
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 20px;
-    min-height: 18px;
-    transition: color 0.2s;
-  }
-
-  .hint.detecting {
-    color: var(--accent);
-  }
-
-  .hint.idp-found {
-    color: var(--success);
-    font-weight: 500;
-  }
-
-  .hint.err { color: var(--error); }
-
-  /* IDP detected pill */
-  .idp-pill {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: #eef3ff;
-    border: 1px solid #c7d8fc;
-    border-radius: 8px;
-    font-size: 13px;
-    color: var(--accent-dark);
-    margin-bottom: 16px;
-    font-weight: 500;
-  }
-
-  .idp-pill.show { display: flex; }
-
-  .idp-pill-dot {
-    width: 7px; height: 7px;
-    background: var(--accent);
-    border-radius: 50%;
-    flex-shrink: 0;
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.6; transform: scale(0.8); }
-  }
-
-  /* Buttons */
-  .btn-primary {
-    width: 100%;
-    padding: 14px;
-    background: var(--accent);
-    color: #fff;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
-    letter-spacing: -0.2px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .btn-primary:hover { background: var(--accent-dark); }
-  .btn-primary:active { transform: scale(0.99); }
-  .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
-
-  .btn-primary .btn-inner {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: opacity 0.2s;
-  }
-
-  .btn-primary.loading .btn-inner { opacity: 0; }
-
-  .btn-spinner {
-    display: none;
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%,-50%);
-    width: 20px; height: 20px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-
-  .btn-primary.loading .btn-spinner { display: block; }
-
-  @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
-
-  /* Divider */
-  .divider {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 20px 0;
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .divider::before, .divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  /* Social IDP buttons */
-  .idp-buttons { display: flex; flex-direction: column; gap: 10px; }
-
-  .btn-idp {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    padding: 12px 16px;
-    background: var(--card);
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    color: var(--ink);
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    text-align: left;
-  }
-
-  .btn-idp:hover { border-color: #bbb; background: #fafafa; }
-
-  .btn-idp svg { width: 20px; height: 20px; flex-shrink: 0; }
-
-  /* Success stage */
-  .success-icon {
-    width: 52px; height: 52px;
-    background: #e8f5ee;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 20px;
-  }
-
-  .success-icon svg { width: 24px; height: 24px; stroke: var(--success); }
-
-  .user-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: #f0f4ff;
-    border-radius: 20px;
-    font-size: 13px;
-    color: var(--accent-dark);
-    margin: 12px 0 20px;
-  }
-
-  .redirect-bar {
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 20px;
-  }
-
-  .redirect-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    width: 0%;
-    transition: width 3s linear;
-  }
-
-  .redirect-label {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 8px;
-  }
-
-  /* Back link */
-  .back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--muted);
-    cursor: pointer;
-    margin-bottom: 28px;
-    transition: color 0.2s;
-    background: none;
-    border: none;
-    padding: 0;
-    font-family: 'DM Sans', sans-serif;
-  }
-  .back-link:hover { color: var(--ink); }
-
-  .terms {
-    margin-top: 24px;
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.6;
-    text-align: center;
-  }
-
-  .terms a { color: var(--accent); text-decoration: none; }
-
-  @media (max-width: 700px) {
-    body { grid-template-columns: 1fr; }
-    .left-panel { display: none; }
-    .right-panel { padding: 32px 24px; align-items: flex-start; padding-top: 60px; }
-  }
-</style>
+  <!-- Fallback UI shown only if JS is disabled -->
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; margin: 0;
+      background: #f3f2f1; color: #323130;
+    }
+    .box {
+      text-align: center; padding: 40px;
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 360px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #edebe9;
+      border-top-color: #0078d4;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    a { color: #0078d4; }
+  </style>
 </head>
 <body>
-
-<!-- Left decorative panel -->
-<div class="left-panel">
-  <div class="brand">
-    <div class="brand-dot"></div>
-    Partner Portal
+  <div class="box">
+    <div class="spinner"></div>
+    <p>Redirecting to sign-in...</p>
+    <p style="font-size:13px;color:#605e5c;margin-top:8px;">
+      Not redirecting? <a id="manualLink" href="#">Click here</a>
+    </p>
   </div>
-
-  <div class="left-content">
-    <h1>Access your<br><em>partner</em><br>workspace.</h1>
-    <p>Sign in or create an account using your organisation's identity provider. No separate credentials needed.</p>
-  </div>
-
-  <div class="trust-badges">
-    <div class="trust-item">
-      <div class="trust-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-      </div>
-      Secured by Microsoft Entra External ID
-    </div>
-    <div class="trust-item">
-      <div class="trust-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5">
-          <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
-        </svg>
-      </div>
-      One-time sign-up, remembered forever
-    </div>
-    <div class="trust-item">
-      <div class="trust-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-      </div>
-      Use your existing work identity
-    </div>
-  </div>
-</div>
-
-<!-- Right: form panel -->
-<div class="right-panel">
-  <div class="card">
-
-    <!-- Stage 1: Email entry -->
-    <div class="stage active" id="stage-email">
-      <div class="card-header">
-        <h2>Welcome, partner.</h2>
-        <p>Enter your work email to get started. We'll route you to your organisation's login.</p>
-      </div>
-
-      <div class="input-wrap">
-        <input
-          type="email"
-          class="email-input"
-          id="emailInput"
-          placeholder="you@yourcompany.com"
-          autocomplete="email"
-          autofocus
-        />
-      </div>
-
-      <div class="hint" id="hintText">We detect your identity provider automatically.</div>
-
-      <div class="idp-pill" id="idpPill">
-        <div class="idp-pill-dot"></div>
-        <span id="idpPillText">IDP detected</span>
-      </div>
-
-      <button class="btn-primary" id="continueBtn" onclick="handleContinue()">
-        <div class="btn-inner">
-          Continue
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
-        </div>
-        <div class="btn-spinner"></div>
-      </button>
-
-      <div class="divider">or continue with</div>
-
-      <div class="idp-buttons">
-        <button class="btn-idp" onclick="loginWithMicrosoft()">
-          <svg viewBox="0 0 24 24"><rect x="1" y="1" width="10" height="10" fill="#f25022"/><rect x="13" y="1" width="10" height="10" fill="#7fba00"/><rect x="1" y="13" width="10" height="10" fill="#00a4ef"/><rect x="13" y="13" width="10" height="10" fill="#ffb900"/></svg>
-          Continue with Microsoft
-        </button>
-        <button class="btn-idp" onclick="loginWithGoogle()">
-          <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-          Continue with Google
-        </button>
-      </div>
-
-      <p class="terms">By continuing you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
-    </div>
-
-    <!-- Stage 2: Redirecting to IDP -->
-    <div class="stage" id="stage-redirect">
-      <button class="back-link" onclick="goBack()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 12H5M12 19l-7-7 7-7"/>
-        </svg>
-        Back
-      </button>
-      <div class="card-header">
-        <h2>Redirecting you now.</h2>
-        <p id="redirectMsg">Taking you to your organisation's login page...</p>
-      </div>
-      <div class="redirect-bar"><div class="redirect-fill" id="redirectFill"></div></div>
-      <p class="redirect-label" id="redirectLabel">Connecting to identity provider...</p>
-    </div>
-
-    <!-- Stage 3: Success -->
-    <div class="stage" id="stage-success">
-      <div class="success-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-      </div>
-      <div class="card-header">
-        <h2>You're in.</h2>
-        <p>Your partner account is set up. Taking you to the workspace...</p>
-      </div>
-      <div class="user-chip">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        <span id="successName">user@company.com</span>
-      </div>
-      <div class="redirect-bar"><div class="redirect-fill" id="successFill"></div></div>
-      <p class="redirect-label">Redirecting to partner resources...</p>
-    </div>
-
-  </div>
-</div>
-
-<script>
-// ─── MSAL CONFIG ────────────────────────────────────────────────────────────
-// Replace these with your actual values
-const CLIENT_ID   = "bf9a3574-ba33-4ad0-9983-8587d6972ca6";
-const TENANT_ID   = "f2c246b1-4fa5-4443-aed3-814c76b2cb0c";
-const REDIRECT_URI = window.location.origin + "/";
-const DESTINATION  = "https://www.chanceofsecurity.com"; // your protected app
-
-// User flow name from Entra — e.g. B2X_1_SignUp
-const USER_FLOW   = "B2X_1_SignUp";
-
-const msalConfig = {
-  auth: {
-    clientId: CLIENT_ID,
-    // Authority points at the tenant + user flow for B2B SSSU
-    authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-    knownAuthorities: ["login.microsoftonline.com"],
-    redirectUri: REDIRECT_URI
-  },
-  cache: {
-    cacheLocation: "sessionStorage",
-    storeAuthStateInCookie: false
-  }
-};
-
-const msalInstance = new msal.PublicClientApplication(msalConfig);
-
-// ─── HRD: known federated domains → IDP hint mapping ────────────────────────
-// Add your partner domains here. MSAL passes domain_hint to skip the
-// account picker and land the user directly on their org's IDP.
-const DOMAIN_IDP_MAP = {
-  // "partnercompany.com": { hint: "partnercompany.com", label: "Partner Company SSO" },
-  // "contoso.com":        { hint: "contoso.com",        label: "Contoso Azure AD" },
-};
-
-// ─── Email debounce for live HRD detection ───────────────────────────────────
-let debounceTimer;
-const emailInput  = document.getElementById("emailInput");
-const hintEl      = document.getElementById("hintText");
-const idpPill     = document.getElementById("idpPill");
-const idpPillText = document.getElementById("idpPillText");
-
-emailInput.addEventListener("input", () => {
-  clearTimeout(debounceTimer);
-  idpPill.classList.remove("show");
-  hintEl.className = "hint";
-  hintEl.textContent = "We detect your identity provider automatically.";
-
-  const val = emailInput.value.trim();
-  if (!val.includes("@")) return;
-
-  const domain = val.split("@")[1]?.toLowerCase();
-  if (!domain || domain.length < 3) return;
-
-  debounceTimer = setTimeout(() => detectIDP(domain), 400);
-});
-
-emailInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") handleContinue();
-});
-
-function detectIDP(domain) {
-  hintEl.className = "hint detecting";
-  hintEl.textContent = `Checking ${domain}...`;
-
-  setTimeout(() => {
-    if (DOMAIN_IDP_MAP[domain]) {
-      const idp = DOMAIN_IDP_MAP[domain];
-      hintEl.className = "hint idp-found";
-      hintEl.textContent = "";
-      idpPillText.textContent = `${idp.label} detected — will redirect automatically`;
-      idpPill.classList.add("show");
-    } else {
-      hintEl.className = "hint";
-      hintEl.textContent = "Sign up with your work email or use Microsoft / Google below.";
-    }
-  }, 350);
-}
-
-// ─── Continue button ─────────────────────────────────────────────────────────
-function handleContinue() {
-  const email  = emailInput.value.trim();
-  const domain = email.split("@")[1]?.toLowerCase();
-
-  if (!email || !email.includes("@") || !domain) {
-    emailInput.classList.add("error");
-    hintEl.className = "hint err";
-    hintEl.textContent = "Please enter a valid work email address.";
-    setTimeout(() => emailInput.classList.remove("error"), 2000);
-    return;
-  }
-
-  const btn = document.getElementById("continueBtn");
-  btn.classList.add("loading");
-  btn.disabled = true;
-
-  showRedirectStage(email, domain);
-}
-
-function showRedirectStage(email, domain) {
-  showStage("stage-redirect");
-
-  const knownIDP = DOMAIN_IDP_MAP[domain];
-  const fill = document.getElementById("redirectFill");
-  const label = document.getElementById("redirectLabel");
-  const msg   = document.getElementById("redirectMsg");
-
-  if (knownIDP) {
-    msg.textContent = `Routing to ${knownIDP.label}...`;
-    label.textContent = `Connecting to ${domain} identity provider...`;
-  } else {
-    msg.textContent = `Routing you to Microsoft Entra sign-up for ${domain}...`;
-    label.textContent = "Launching sign-up flow...";
-  }
-
-  // Animate the progress bar then trigger MSAL redirect
-  requestAnimationFrame(() => {
-    fill.style.width = "70%";
-  });
-
-  setTimeout(() => {
-    triggerLogin(email, domain, knownIDP);
-  }, 1200);
-}
-
-// ─── MSAL login redirect ─────────────────────────────────────────────────────
-function triggerLogin(email, domain, knownIDP) {
-  const loginRequest = {
-    scopes: ["openid", "profile", "email"],
-    loginHint: email,       // pre-fills email on Microsoft login page
-  };
-
-  // If it's a known federated domain, pass domain_hint to skip account picker
-  if (knownIDP) {
-    loginRequest.extraQueryParameters = {
-      domain_hint: knownIDP.hint
-    };
-  }
-
-  // For the B2B user flow, encode the policy in the authority
-  // Uncomment if your user flow needs to be explicitly referenced:
-  // loginRequest.authority = `https://login.microsoftonline.com/${TENANT_ID}?p=${USER_FLOW}`;
-
-  msalInstance.loginRedirect(loginRequest).catch(err => {
-    console.error(err);
-    showError(err.errorMessage || "Authentication failed. Please try again.");
-  });
-}
-
-function loginWithMicrosoft() {
-  msalInstance.loginRedirect({
-    scopes: ["openid", "profile", "email"],
-    extraQueryParameters: { domain_hint: "organizations" }
-  }).catch(err => showError(err.errorMessage));
-}
-
-function loginWithGoogle() {
-  // Google federation via Entra External ID
-  // Ensure Google is added as an IDP in Entra External Identities
-  msalInstance.loginRedirect({
-    scopes: ["openid", "profile", "email"],
-    extraQueryParameters: { domain_hint: "google.com" }
-  }).catch(err => showError(err.errorMessage));
-}
-
-// ─── Handle redirect return ───────────────────────────────────────────────────
-msalInstance.handleRedirectPromise().then(response => {
-  if (response && response.account) {
-    handleSuccess(response.account);
-  } else {
-    const accounts = msalInstance.getAllAccounts();
-    if (accounts.length > 0) {
-      handleSuccess(accounts[0]);
-    }
-    // else: no session, stay on sign-up page
-  }
-}).catch(err => {
-  console.error("MSAL redirect error:", err);
-  showError(err.errorMessage || err.message || "Authentication error.");
-});
-
-function handleSuccess(account) {
-  showStage("stage-success");
-  document.getElementById("successName").textContent = account.username || account.name;
-  const fill = document.getElementById("successFill");
-  requestAnimationFrame(() => { fill.style.width = "100%"; });
-  setTimeout(() => {
-    window.location.href = DESTINATION;
-  }, 3000);
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function showStage(id) {
-  document.querySelectorAll(".stage").forEach(s => s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-}
-
-function goBack() {
-  const btn = document.getElementById("continueBtn");
-  btn.classList.remove("loading");
-  btn.disabled = false;
-  showStage("stage-email");
-}
-
-function showError(msg) {
-  goBack();
-  hintEl.className = "hint err";
-  hintEl.textContent = msg;
-}
-</script>
+  <script>
+    // Set manual fallback link (runs after the redirect script above)
+    document.getElementById('manualLink').href = ENTRA_URL;
+  </script>
 </body>
 </html>
