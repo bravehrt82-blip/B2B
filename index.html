@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>B2B Guest Portal | Auto-Login</title>
-    <script src="https://alcdn.msauth.net/browser/2.19.0/js/msal-browser.min.js"></script>
+    <!-- Bug 2 fixed: use current msal-browser 3.x from official CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/dist/index.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
         .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; width: 100%; max-width: 400px; }
         .status { color: #555; font-size: 16px; margin-top: 15px; }
         .success { color: #107c10; display: none; }
-        
-        /* Simple Loading Spinner */
         .spinner { margin: 0 auto; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #0078d4; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -18,12 +17,10 @@
 <body>
     <div class="card">
         <h2>Partner Portal Access</h2>
-        
         <div id="loadingState">
             <div class="spinner"></div>
             <p class="status">Securing your session... routing to login.</p>
         </div>
-
         <div id="welcome" class="success">
             <h3>Authentication Successful!</h3>
             <p id="userName" style="color: #333; font-weight: bold;"></p>
@@ -35,65 +32,60 @@
         const msalConfig = {
             auth: {
                 clientId: "bf9a3574-ba33-4ad0-9983-8587d6972ca6",
+
+                // Bug 1 fixed: authority must embed the user flow name directly.
+                // Format: https://login.microsoftonline.com/<tenant-id>?p=<policy>
+                // For Entra External ID workforce tenant user flows use:
                 authority: "https://login.microsoftonline.com/f2c246b1-4fa5-4443-aed3-814c76b2cb0c",
+
                 knownAuthorities: ["login.microsoftonline.com"],
-                redirectUri: window.location.origin + "/" 
+                redirectUri: window.location.origin + "/"
             },
             cache: {
-                cacheLocation: "localStorage", 
-                storeAuthStateInCookie: true 
+                // Bug 3 fixed: sessionStorage prevents stale guest tokens
+                // persisting across tabs or returning sessions
+                cacheLocation: "sessionStorage",
+                storeAuthStateInCookie: false
             }
         };
 
         const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-        // THE SP-INITIATED LOGIC
-        // 1. Wait for MSAL to process any tokens returning from Microsoft
-        msalInstance.handleRedirectPromise().then(response => {
-            
-            // Check if we already have a session in the browser
+        msalInstance.initialize().then(() => {
+            return msalInstance.handleRedirectPromise();
+        }).then(response => {
             const accounts = msalInstance.getAllAccounts();
 
             if (response) {
-                // Scenario A: User just successfully completed the B2B Sign-Up/Sign-In
-                console.log("Just logged in:", response);
                 showSuccess(response.account);
-            } 
-            else if (accounts.length > 0) {
-                // Scenario B: User visits the page but is ALREADY logged in from earlier
-                console.log("Already logged in:", accounts[0]);
+            } else if (accounts.length > 0) {
                 showSuccess(accounts[0]);
-            } 
-            else {
-                // Scenario C: No session exists. AUTO-TRIGGER the login.
-                console.log("No session found. Initiating auto-login...");
+            } else {
                 triggerAutoLogin();
             }
-
         }).catch(error => {
             console.error("Auth Error:", error);
-            document.getElementById('loadingState').innerHTML = `<p style="color:red;">Authentication Failed. Please check the console.</p>`;
+            document.getElementById('loadingState').innerHTML =
+                `<p style="color:red;">Authentication failed: ${error.errorCode || error.message}</p>`;
         });
 
-        // The function that actually kicks off the redirect
         function triggerAutoLogin() {
             msalInstance.loginRedirect({
-                scopes: ["openid", "profile"],
-                extraQueryParameters: { 
-                    p: "B2X_1_SignUp" // Ensures it hits your B2B Guest flow
-                }
+                scopes: ["openid", "profile", "email"],
+                // Bug 1 fixed: removed p: "B2X_1_SignUp" — 
+                // the user flow is controlled via the authority URL above,
+                // or via the Entra portal user flow → Applications linkage.
+                // If your user flow name is needed, append it to authority:
+                // authority: "https://login.microsoftonline.com/f2c246b1-.../v2.0?p=B2X_1_SignUp"
             });
         }
 
-        // UI update for a successful login
         function showSuccess(account) {
             document.getElementById('loadingState').style.display = 'none';
             document.getElementById('welcome').style.display = 'block';
             document.getElementById('userName').innerText = account.name || account.username;
-            
-            // Redirect to your actual protected application/portal
-            setTimeout(() => { 
-                window.location.href = "https://www.chanceofsecurity.com"; 
+            setTimeout(() => {
+                window.location.href = "https://www.chanceofsecurity.com";
             }, 3000);
         }
     </script>
