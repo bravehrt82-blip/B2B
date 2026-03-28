@@ -21,96 +21,40 @@
       max-width: 600px;
       margin: 1rem;
     }
-    h1 {
-      color: #2c3e50;
-      margin-bottom: 1rem;
-    }
-    p {
-      color: #34495e;
-      line-height: 1.6;
-    }
-    .loader {
-      width: 48px;
-      height: 48px;
-      border: 5px solid #f3f3f3;
-      border-radius: 50%;
-      border-top: 5px solid #3498db;
-      animation: spin 1s linear infinite;
-      margin: 2rem auto;
-    }
-    .hidden {
-      display: none !important;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    h1 { color: #2c3e50; margin-bottom: 1rem; }
+    p { color: #34495e; line-height: 1.6; }
   </style>
-  <title>Auto Sign-In with Session Logic</title>
+  <title>Cloudy With a Chance Of Security</title>
   <script src="https://alcdn.msauth.net/browser/2.19.0/js/msal-browser.min.js"></script>
-  <script>
-    const sessionCookieName = "sessionActive";
-
-    function isSessionCookieSet() {
-      return document.cookie.split("; ")
-        .some(cookie => cookie.startsWith(sessionCookieName + "="));
-    }
-
-    function setSessionCookie() {
-      document.cookie = sessionCookieName + "=1; path=/; secure";
-    }
-
-    // MSAL config WITHOUT the /authorize path
-    const msalConfig = {
-      auth: {
-        clientId: "bf9a3574-ba33-4ad0-9983-8587d6972ca6",
-        authority: "https://login.microsoftonline.com/f2c246b1-4fa5-4443-aed3-814c76b2cb0c",
-        knownAuthorities: ["login.microsoftonline.com"],
-        redirectUri: "https://black-river-095c9a80f.4.azurestaticapps.net"
-      },
-      cache: {
-        cacheLocation: "localStorage",
-        storeAuthStateInCookie: false
-      }
-    };
-
-    const msalInstance = new msal.PublicClientApplication(msalConfig);
-
-    msalInstance.handleRedirectPromise()
-        .then(response => {
-            if (response) {
-                console.log("Login successful:", response);
-                setSessionCookie();
-                // Show the welcome container
-                document.getElementById('welcomeContainer').classList.remove('hidden');
-                // Add delay before redirect
-                setTimeout(() => {
-                    window.location.href = "https://msn.com";
-                }, 5000);
-            } else {
-                if (!isSessionCookieSet()) {
-                    localStorage.clear();
-                }
-                // Pass user flow name in extraQueryParameters
-                msalInstance.loginRedirect({
-                    scopes: ["openid", "profile"],
-                    extraQueryParameters: { p: "B2X_1_SignUp" }
-                });
-            }
-        })
-        .catch(error => {
-            console.error("Login error:", error);
-        });
-  </script>
 </head>
 <body>
-    <div class="container hidden" id="welcomeContainer">
+    <div class="container" id="mainContainer">
         <h1>Welcome to Cloudy With a Chance Of Security! 🚀</h1>
-        <p>You've successfully completed the Microsoft Entra ID self-service sign-up process.</p>
-        <p>Your account has been created and verified through our secure authentication system.</p>
-        <p>In a moment, you'll be redirected to my main blog platform where you can explore security insights and knowledge.</p>
-        <div class="loader"></div>
-        <p><small>If you're not redirected automatically, please wait a few seconds...</small></p>
+        <p>This is your default landing page.</p>
+        <p>The authentication logic is now passive. You are seeing this because the auto-redirect has been disabled.</p>
     </div>
+
+    <script>
+        const msalConfig = {
+            auth: {
+                clientId: "bf9a3574-ba33-4ad0-9983-8587d6972ca6",
+                authority: "https://login.microsoftonline.com/f2c246b1-4fa5-4443-aed3-814c76b2cb0c",
+            }
+        };
+
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+        // We still handle the promise in case a user comes back FROM a login,
+        // but we removed the "msalInstance.loginRedirect" call that was causing the loop.
+        msalInstance.handleRedirectPromise()
+            .then(response => {
+                if (response) {
+                    console.log("User is logged in:", response.account.username);
+                } else {
+                    console.log("No active session, but staying on page.");
+                }
+            })
+            .catch(error => { console.error(error); });
+    </script>
 </body>
 </html>
