@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Partner Portal — Signing you in...</title>
+
   <!--
     ══════════════════════════════════════════════════════
     HOW THIS WORKS
@@ -27,28 +28,52 @@
     CONFIGURATION — update the 4 values below:
   -->
   <script>
-    const CLIENT_ID   = "bf9a3574-ba33-4ad0-9983-8587d6972ca6";
-    const TENANT_ID   = "f2c246b1-4fa5-4443-aed3-814c76b2cb0c";
-    const USER_FLOW   = "B2X_1_SignUp";      // your user flow name (auto-prefixed with B2X_1_ in Entra)
-    const REDIRECT_URI = window.location.origin + "/callback.html"; // where Entra returns the user
+    const CLIENT_ID    = "bf9a3574-ba33-4ad0-9983-8587d6972ca6";
+    const TENANT_ID    = "f2c246b1-4fa5-4443-aed3-814c76b2cb0c";
+    const USER_FLOW    = "B2X_1_SignUp";
+    const REDIRECT_URI = window.location.origin + "/callback.html";
 
-    // Build the Entra authorize URL directly — no library needed
-    const params = new URLSearchParams({
-      client_id:     CLIENT_ID,
-      response_type: "code",
-      response_mode: "query",
-      redirect_uri:  REDIRECT_URI,
-      scope:         "openid profile email",
-      p:             USER_FLOW,              // tells Entra which user flow to use
-      nonce:         crypto.randomUUID(),    // replay protection
-      state:         btoa(window.location.href), // return to this page after login
-    });
+    // PKCE helpers — required because app is registered as SPA platform in Entra
+    function generateRandomString(length) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+      const array = new Uint8Array(length);
+      crypto.getRandomValues(array);
+      return Array.from(array).map(b => chars[b % chars.length]).join('');
+    }
 
-    const ENTRA_URL =
-      `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?${params}`;
+    async function generateCodeChallenge(verifier) {
+      const data = new TextEncoder().encode(verifier);
+      const digest = await crypto.subtle.digest('SHA-256', data);
+      return btoa(String.fromCharCode(...new Uint8Array(digest)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
 
-    // Immediate redirect — user never sees this page
-    window.location.replace(ENTRA_URL);
+    async function startLogin() {
+      const codeVerifier  = generateRandomString(64);
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+      // Persist verifier so callback.html can exchange the code
+      sessionStorage.setItem('pkce_verifier', codeVerifier);
+
+      const params = new URLSearchParams({
+        client_id:             CLIENT_ID,
+        response_type:         "code",
+        response_mode:         "query",
+        redirect_uri:          REDIRECT_URI,
+        scope:                 "openid profile email",
+        p:                     USER_FLOW,
+        nonce:                 crypto.randomUUID(),
+        state:                 generateRandomString(16),
+        code_challenge:        codeChallenge,
+        code_challenge_method: "S256",
+      });
+
+      const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?${params}`;
+      document.getElementById('manualLink').href = url;
+      window.location.replace(url);
+    }
+
+    startLogin();
   </script>
 
   <!-- Fallback UI shown only if JS is disabled -->
@@ -85,9 +110,6 @@
       Not redirecting? <a id="manualLink" href="#">Click here</a>
     </p>
   </div>
-  <script>
-    // Set manual fallback link (runs after the redirect script above)
-    document.getElementById('manualLink').href = ENTRA_URL;
-  </script>
+  
 </body>
 </html>
