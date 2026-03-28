@@ -61,7 +61,6 @@
         response_mode:         "query",
         redirect_uri:          REDIRECT_URI,
         scope:                 "openid profile email",
-        p:                     USER_FLOW,
         nonce:                 crypto.randomUUID(),
         state:                 generateRandomString(16),
         code_challenge:        codeChallenge,
